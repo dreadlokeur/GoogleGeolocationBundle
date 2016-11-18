@@ -18,8 +18,7 @@ use Buzz\Browser;
  *
  * @link http://code.google.com/apis/maps/documentation/geocoding/
  */
-class GeolocationApi
-{
+class GeolocationApi {
 
     /**
      * Specifies cache availability
@@ -42,7 +41,7 @@ class GeolocationApi
      * @var int
      */
     protected $dailyLimit;
-    
+
     /**
      * Network layer
      *
@@ -58,13 +57,12 @@ class GeolocationApi
      */
     protected $cacheLifetime;
 
-    public function __construct(Browser $browser = null)
-    {
+    public function __construct(Browser $browser = null) {
         $this->browser = $browser ?: new Browser();
-        
-        $this->em               = null;
-        $this->dailyLimit       = 0;            // No restriction
-        $this->cacheLifetime    = 0;
+
+        $this->em = null;
+        $this->dailyLimit = 0;            // No restriction
+        $this->cacheLifetime = 0;
 
         $this->cacheAvailable = false;
     }
@@ -75,8 +73,7 @@ class GeolocationApi
      *
      * @param \Doctrine\ORM\EntityManager   $em     EntityManager
      */
-    public function setEntityManager(\Doctrine\ORM\EntityManager $em = null)
-    {
+    public function setEntityManager(\Doctrine\ORM\EntityManager $em = null) {
         $this->em = $em;
         // Cache become available now
         $this->setCacheEnabled();
@@ -88,8 +85,7 @@ class GeolocationApi
      *
      * @param   int     $dailyLimit         The daily limit
      */
-    public function setDailyLimit($dailyLimit)
-    {
+    public function setDailyLimit($dailyLimit) {
         $this->dailyLimit = $dailyLimit;
     }
 
@@ -99,8 +95,7 @@ class GeolocationApi
      *
      * @param   int     $cacheLifetime      Duration Geocoded result will be cached for
      */
-    public function setCacheLifetime($cacheLifetime)
-    {
+    public function setCacheLifetime($cacheLifetime) {
         $this->cacheLifetime = $cacheLifetime;
     }
 
@@ -109,71 +104,73 @@ class GeolocationApi
      *
      * @param Browser   $browser        Browser
      */
-    public function setBrowser(Browser $browser)
-    {
+    public function setBrowser(Browser $browser) {
         $this->browser = $browser;
     }
-    
+
     /**
      * Enable the cache
      */
-    public function setCacheEnabled()
-    {
-        if (true === is_null($this->em))
-        {
+    public function setCacheEnabled() {
+        if (true === is_null($this->em)) {
             throw new \Exception("Cannot enable cache. EntityManager must be set via setEntityManager()");
         }
-        
+
         $this->cacheAvailable = true;
     }
-    
+
     /**
      * Disable the cache
      */
-    public function setCacheDisabled()
-    {
+    public function setCacheDisabled() {
         $this->cacheAvailable = false;
     }
-    
-    public function locateAddress($search)
-    {
+
+    public function latLngToAddress($lat, $lng) {
+        //todo cache
+        $response = $this->requestLatLng($lat, $lng);
+        $address = json_decode($response->getContent(), true);
+        return isset($address['results'][0]['formatted_address']) ? $address['results'][0]['formatted_address'] : null;
+    }
+
+    private function requestLatLng($lat, $lng) {
+        return $this->browser->get('http://maps.googleapis.com/maps/api/geocode/json?' .
+                        http_build_query(
+                                array('latlng' => $lat . ',' . $lng, 'sensor' => 'true')
+                        )
+        );
+    }
+
+    public function locateAddress($search) {
         $location = null;
-        if ($this->cacheAvailable)
-        {
+        if ($this->cacheAvailable) {
             // Check the cache first
             $location = $this->em
-                             ->getRepository('GoogleGeolocationBundle:Location')
-                             ->getCachedAddress($search);
+                    ->getRepository('GoogleGeolocationBundle:Location')
+                    ->getCachedAddress($search);
         }
 
-        if (true === is_null($location))
-        {
+        if (true === is_null($location)) {
             // No cache, Use Google Geolocation API
             $location = new Location();
             $location->setSearch($search);
 
             $location = $this->geolocate($location);
-        }
-        else
-        {
+        } else {
             // Check the status, if last request status was OVER_QUERY_LIMIT
             // and now is a different day to last attempt, we need to query API
             // again
             if ('OVER_QUERY_LIMIT' === $location->getStatus() &&
-                $location->isRequestAgainAllowed())
-            {
+                    $location->isRequestAgainAllowed()) {
                 $location = $this->geolocate($location);
-            }
-            else
-            {
+            } else {
                 // We have a hit
                 $location->incrementHits();
             }
         }
 
         // Only persist if cache is available
-        if ($this->cacheAvailable)
-        {
+        if ($this->cacheAvailable) {
             $this->em->persist($location);
             $this->em->flush();
         }
@@ -186,18 +183,16 @@ class GeolocationApi
      *
      * @return int              The number of cleaned entries
      */
-    public function cleanCache()
-    {
-        if (false === $this->cacheAvailable)
-        {
+    public function cleanCache() {
+        if (false === $this->cacheAvailable) {
             throw new \Exception("Unable to clean cache. There is no cache available");
         }
 
-        $expiresAt = date("Y-m-d H:i:s", mktime(date("H")-$this->cacheLifetime));
+        $expiresAt = date("Y-m-d H:i:s", mktime(date("H") - $this->cacheLifetime));
         // Clean cache
         return $this->em
-                    ->getRepository('GoogleGeolocationBundle:Location')
-                    ->cleanCache($expiresAt);
+                        ->getRepository('GoogleGeolocationBundle:Location')
+                        ->cleanCache($expiresAt);
     }
 
     /**
@@ -206,27 +201,22 @@ class GeolocationApi
      * @param   Google\GeolocationBundle\Entity\Location    $location
      * @return  Google\GeolocationBundle\Entity\Location
      */
-    protected function geolocate(\Google\GeolocationBundle\Entity\Location $location)
-    {
+    protected function geolocate(\Google\GeolocationBundle\Entity\Location $location) {
         // Check limiting
-        if ($this->apiAttemptsAllowed())
-        {
-            $response   = $this->request($location->getSearch());
-            $data       = json_decode($response->getContent(), true);
+        if ($this->apiAttemptsAllowed()) {
+            $response = $this->request($location->getSearch());
+            $data = json_decode($response->getContent(), true);
 
-            if (true === $this->cacheAvailable)
-            {
+            if (true === $this->cacheAvailable) {
                 // Log the result
                 $this->logResponse($data);
             }
 
-            $status     = $data['status'];
-            $result     = $data['results'];
-        }
-        else
-        {
-            $status     = 'REQUEST_NOT_ALLOWED';
-            $result     = array();
+            $status = $data['status'];
+            $result = $data['results'];
+        } else {
+            $status = 'REQUEST_NOT_ALLOWED';
+            $result = array();
         }
 
         $location->setResult(json_encode($result));
@@ -247,12 +237,11 @@ class GeolocationApi
      *
      * @return  array           cURL response from web service
      */
-    protected function request($search)
-    {
+    protected function request($search) {
         return $this->browser->get('http://maps.googleapis.com/maps/api/geocode/json?' .
-            http_build_query(
-                array('address' => $search, 'sensor' => 'false')
-            )
+                        http_build_query(
+                                array('address' => $search, 'components' => 'country:FR', 'sensor' => 'false')
+                        )
         );
     }
 
@@ -263,29 +252,25 @@ class GeolocationApi
      *
      * @return bool         Returns TRUE is requests can be made to API
      */
-    protected function apiAttemptsAllowed()
-    {
+    protected function apiAttemptsAllowed() {
         // We can only limit if there is a cache available
-        if (false === $this->cacheAvailable)
-        {
+        if (false === $this->cacheAvailable) {
             return true;
         }
 
         // Check last request status
         $apiLog = $this->em
-                       ->getRepository('GoogleGeolocationBundle:ApiLog')
-                       ->getLogForDate();
+                ->getRepository('GoogleGeolocationBundle:ApiLog')
+                ->getLogForDate();
 
-        if (true === is_null($apiLog))
-        {
+        if (true === is_null($apiLog)) {
             // No history for today, we are OK to proceed
             return true;
         }
 
         // Check daily limit and last status
         if ($apiLog->getRequests() <= $this->dailyLimit &&
-            'OVER_QUERY_LIMIT' !== $apiLog->getLastStatus())
-        {
+                'OVER_QUERY_LIMIT' !== $apiLog->getLastStatus()) {
             return true;
         }
 
@@ -298,15 +283,13 @@ class GeolocationApi
      * @param   array   $response                           Raw response from API
      * @return  Google\GeolocationBundle\Entity\ApiLog      The updated log entity
      */
-    protected function logResponse($response)
-    {
+    protected function logResponse($response) {
         // Get existing log for today
         $apiLog = $this->em
-                       ->getRepository('GoogleGeolocationBundle:ApiLog')
-                       ->getLogForDate();
+                ->getRepository('GoogleGeolocationBundle:ApiLog')
+                ->getLogForDate();
 
-        if (true === is_null($apiLog))
-        {
+        if (true === is_null($apiLog)) {
             $apiLog = new ApiLog();
         }
 
@@ -318,4 +301,5 @@ class GeolocationApi
 
         return $apiLog;
     }
+
 }
