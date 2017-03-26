@@ -17,6 +17,7 @@ use Buzz\Browser;
  * Only supports address geolocation at present, reverse geolocation not supported.
  *
  * @link http://code.google.com/apis/maps/documentation/geocoding/
+ * 
  */
 class GeolocationApi {
 
