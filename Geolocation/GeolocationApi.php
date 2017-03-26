@@ -126,11 +126,17 @@ class GeolocationApi {
         $this->cacheAvailable = false;
     }
 
-    public function latLngToAddress($lat, $lng) {
+    public function latLngToAddress($lat, $lng, $returnFullDetails = false) {
         //todo cache
         $response = $this->requestLatLng($lat, $lng);
         $address = json_decode($response->getContent(), true);
-        return isset($address['results'][0]['formatted_address']) ? $address['results'][0]['formatted_address'] : null;
+        if (!isset($address['results'][0]))
+            return null;
+
+        if (!$returnFullDetails)
+            return $address['results'][0]['formatted_address'];
+
+        return $address['results'][0]['address_components'];
     }
 
     private function requestLatLng($lat, $lng) {
