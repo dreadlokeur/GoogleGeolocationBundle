@@ -161,28 +161,54 @@ class GeolocationApi {
             // No cache, Use Google Geolocation API
             $location = new Location();
             $location->setSearch($search);
-
             $location = $this->geolocate($location);
-        } else {
-            // Check the status, if last request status was OVER_QUERY_LIMIT
-            // and now is a different day to last attempt, we need to query API
-            // again
-            if ('OVER_QUERY_LIMIT' === $location->getStatus() /*&& $location->isRequestAgainAllowed()*/) {
-                $location = $this->geolocate($location);
-            } else {
-                // We have a hit
-                $location->incrementHits();
-            }
         }
 
         // Only persist if cache is available
-        if ($this->cacheAvailable) {
+        if ($this->cacheAvailable && 'OK' == $location->getStatus()) {
             $this->em->persist($location);
             $this->em->flush();
         }
 
         return $location;
     }
+
+//    public function locateAddress($search) {
+//        $location = null;
+//        if ($this->cacheAvailable) {
+//            // Check the cache first
+//            $location = $this->em
+//                    ->getRepository('GoogleGeolocationBundle:Location')
+//                    ->getCachedAddress($search);
+//        }
+//
+//        if (true === is_null($location)) {
+//            // No cache, Use Google Geolocation API
+//            $location = new Location();
+//            $location->setSearch($search);
+//
+//            $location = $this->geolocate($location);
+//        } else {
+//            // Check the status, if last request status was OVER_QUERY_LIMIT
+//            // and now is a different day to last attempt, we need to query API
+//            // again
+//            if ('OVER_QUERY_LIMIT' === $location->getStatus() &&
+//                    $location->isRequestAgainAllowed()) {
+//                $location = $this->geolocate($location);
+//            } else {
+//                // We have a hit
+//                $location->incrementHits();
+//            }
+//        }
+//
+//        // Only persist if cache is available
+//        if ($this->cacheAvailable) {
+//            $this->em->persist($location);
+//            $this->em->flush();
+//        }
+//
+//        return $location;
+//    }
 
     /**
      * Clean the cache of expired entries
