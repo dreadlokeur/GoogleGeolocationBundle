@@ -285,6 +285,7 @@ class GeolocationApi {
      * @return bool         Returns TRUE is requests can be made to API
      */
     protected function apiAttemptsAllowed() {
+        return true;
         // We can only limit if there is a cache available
         if (false === $this->cacheAvailable) {
             return true;
