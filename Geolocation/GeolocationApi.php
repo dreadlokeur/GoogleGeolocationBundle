@@ -167,8 +167,7 @@ class GeolocationApi {
             // Check the status, if last request status was OVER_QUERY_LIMIT
             // and now is a different day to last attempt, we need to query API
             // again
-            if ('OVER_QUERY_LIMIT' === $location->getStatus() &&
-                    $location->isRequestAgainAllowed()) {
+            if ('OVER_QUERY_LIMIT' === $location->getStatus() /*&& $location->isRequestAgainAllowed()*/) {
                 $location = $this->geolocate($location);
             } else {
                 // We have a hit
